@@ -2,74 +2,118 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./gameAsset.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
-contract DegenERC20 is ERC20{
+contract DegenToken is ERC20, Ownable, ERC20Burnable {
 
+    struct Item {
+        string name;
+        uint8 itemId;
+        uint256 price;
+    }
+    mapping (uint8=>Item) items;
+    mapping (address=>Item[]) playerItems;
+    uint8 public tokenId;
+    
+    event ItemPurchased(address indexed buyer, uint8 itemId, string itemName, uint256 price);
+    event GameOutcome(address indexed player, uint256 num, bool won, string result);
 
-    modifier onlyOwner{
-        require(owner == msg.sender);
-        _;
+    constructor (address initialOwner, uint tokenSupply) ERC20("Degen", "DGN") Ownable(initialOwner) {
+        mint(initialOwner, tokenSupply);
+        
+        items[1] = Item("Novice Navigator",1, 100);
+        items[2]=Item("Mythic Maverick", 2, 700);
+        items[3]=Item("Celestial Crusher", 3, 1200);
+        items[4]=Item("Astral Ace", 4, 2200);
+        items[5]=Item("Divine Dominator", 5, 2400);
+        tokenId=6;
+
     }
 
-    address private immutable owner;
-    uint private CountToken;
-    GameAsset immutable gameAsset;
+    function decimals() override public pure returns (uint8){
+        return 0;
+    }
 
+    // Minting tokens
 
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
 
-    constructor(uint _tokenToMint) ERC20("Degen","DGN"){
-        owner = msg.sender;
-        gameAsset = new GameAsset();
-        _mint(msg.sender, _tokenToMint); // very small amount because it takes high gas fees 
-    }   
+    // Transferring tokens
 
-    ///@notice to reward a certain user by _amount amount only callable by the owner.
+    function transferToken(address _recipient, uint _amount) external {
+        require(balanceOf(msg.sender)>=_amount, "Insufficient balance");
+        transfer(_recipient, _amount);
+    }
 
-    function mintTokenReward(address _address,uint _amount) external onlyOwner{
-        _mint(_address,_amount);
+    // Redeeming tokens
+
+    function welcomeBonus() public {
+        require(balanceOf(msg.sender) == 0, "You've already claimed your welcome bonus");
+        _mint(msg.sender, 50);
+    }
+
+    function addItem(string memory _name, uint256 _price) public onlyOwner {
+        items[tokenId] = Item(_name, tokenId,_price);
+        tokenId++;
+    } 
+
+    function isLessThanFive(bool _prediction, uint256 _betAmount) public {
+        uint randomNumber = uint(keccak256(abi.encodePacked(block.timestamp, msg.sender))) % 10;
+
+        if (_prediction ==(randomNumber<5)) {
+            _mint(msg.sender, _betAmount*2);
+            emit GameOutcome(msg.sender, randomNumber, true, "won");
+
+        } else {
+            burn(_betAmount);
+            emit GameOutcome(msg.sender, randomNumber, false, "lost");
+        }
+    }
+    
+    function purchaseItem(uint8 _itemId) external {
+        require(items[_itemId].price != 0, "Item not found");
+        require(balanceOf(msg.sender) >= items[_itemId].price, "Insufficient balance");
+
+        burn(items[_itemId].price);
+        playerItems[msg.sender].push(items[_itemId]);
+
+        emit ItemPurchased(msg.sender, _itemId, items[_itemId].name, items[_itemId].price);
+    }
+
+    function getUserItems(address user) external view returns (uint8[] memory) {
+        Item[] memory itemsList = playerItems[user];
+        uint length = itemsList.length;
+
+        uint8[] memory _ids = new uint8[](length);
+
+        for (uint i = 0; i < length; i++) {
+            _ids[i] = itemsList[i].itemId;
+        }
+
+        return _ids;
+    }
+    function getItemName(uint8 _id) external  view returns (string memory) {
+        return items[_id].name;
+    }
+    function getItemPrice(uint8 _id) external  view returns(uint){
+        return items[_id].price;
     }
 
 
-    ///@notice for checking the balance of token of caller account.
+    // Checking token balance
 
-
-    function checkingBalance() external view returns(uint){
+    function getBalance() external view returns(uint256){
         return balanceOf(msg.sender);
     }
 
+    // Burning tokens
 
-    ///@notice to transfer token to other account(friend)
-
-    function tranferTokens(address _recepient, uint _amount) external{
-        require(balanceOf(msg.sender) >= _amount);
-       transfer(_recepient, _amount);
-       
+    function burnToken(uint _amount) external {
+        require(balanceOf(msg.sender)>=_amount, "Insufficient amount");
+        burn(_amount);
     }
 
-
-    ///@notice redeeming one token for a NFT 
-    function redeemTokens() external{
-        require(balanceOf(msg.sender) >= 1);
-        _transfer(msg.sender, address(this), 1);
-        gameAsset.safeMint(msg.sender);
-    }
-
-
-    ///@notice burn the _tokenAmount amount of token
-
-    function burnToken(uint _tokenAmount) external {
-        require( balanceOf(msg.sender)>=_tokenAmount);
-        _burn(msg.sender, _tokenAmount);
-    }
-
-
-    ///@notice to withdraw all tokens
-    function withdraw() external onlyOwner{
-          _transfer(address(this), owner, balanceOf(address(this)));
-    }
-
-    // ///@notice to receive wei/ethers from external sources like other account
-
-    receive() external payable { }
 }
