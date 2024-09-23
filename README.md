@@ -1,136 +1,89 @@
-# Metacrafters- ETH + AVAX PROOF: Intermediate EVM Course - Module 4
+# ERC-20 Degen Token Contract
+
+This Solidity program demonstrates an ERC-20 Token with support for the transfer, minting, and burning of tokens, as well as additional gaming and in-game item functionalities.
+
 ## Description
 
-This course teaches how to build decentralized applications (Dapps) on the Ethereum blockchain and Avalanche using the Solidity programming language.
-The course teaches how to create smart contracts, connect them to wallets, build a user interface, and deploy your Dapps. This is the detailed review of the fourth module of the same course. 
+The Solidity contract `DegenToken` defines an ERC-20 token with essential functionalities such as minting, burning, and transferring tokens. It also includes a system for purchasing and redeeming in-game items. Additionally, users can participate in a simple game where they bet tokens on random outcomes. The contract uses the OpenZeppelin library for security and follows the ERC-20 standard.
 
-## Code Explanation
+# Contract Overview
+The `DegenToken` contract is a basic implementation of an ERC-20-like token with additional game-related features. It includes the following components:
 
-```Solidity
+1) **`owner`**: The owner's address is set when the contract is deployed, allowing them to mint new tokens and add game items.
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-```
+2) **`items`**: A mapping that stores in-game items available for purchase using tokens, each with a unique `itemId`, name, and price.
 
-Importing the OpenZeppelin ERC20 Contract and inheriting it to my contract using `is` keyword.
+3) **`playerItems`**: A mapping that tracks which items have been purchased by each user.
 
-Using the constructor initlializing the owner state variable and minting some token for the owner.
+# Usage
 
-```Solidity
-  constructor(uint _tokenToMint) ERC20("Degen","DGN"){
-        owner = msg.sender;
-        gameAsset = new GameAsset();
-        _mint(msg.sender, _tokenToMint); // very small amount because it takes high gas fees 
-    } 
-```
+### Constructor
 
-Minting the reward Token for another account ( its like giving the reward in the form of Tokens)
+The contract constructor initializes the token with an initial supply and assigns the deploying address as the owner. The owner can also mint new tokens or add in-game items.
 
-- I am not minning but transfering tokens because to save the transaction cost.
+Functions
 
-```Solidity
+mint(address to, uint256 amount);
+// Allows the contract owner to mint new tokens and add them to a specified address's balance.
 
- ///@notice to reward a certain user by _amount amount only callable by the owner.
+burn(uint256 amount);
+// Allows users to burn (destroy) a specific amount of their tokens.
 
-    function mintTokenReward(address _address,uint _amount) external onlyOwner{
-        _mint(_address,_amount);
-    }
-```
+transferToken(address recipient, uint256 amount);
+// Allows users to transfer a specified amount of tokens from sender to recipient.
 
-Through this checkingBalance function anyone can check his/her token balance.
-In degen game it will help to show/display/check the token balance of the current account.
+welcomeBonus();
+// Allows new users to claim a welcome bonus of 50 tokens, but only if they have a zero balance.
 
-```Solidity
+addItem(string memory _name, uint256 _price);
+// Allows the owner to add new in-game items to the system, with a unique ID and price in tokens.
 
-  ///@notice for checking the balance of token of caller account.
+isLessThanFive(bool _prediction, uint256 _betAmount);
+// A simple game where users bet tokens on whether a random number (0-9) is less than 5. Winners double their bet.
 
+purchaseItem(uint8 _itemId);
+// Allows users to purchase in-game items using tokens, reducing their balance and storing the purchased items in `playerItems`.
 
-    function checkingBalance() external view returns(uint){
-        return balanceOf(msg.sender);
-    }
+getUserItems(address user) external view returns (uint8[] memory);
+// Returns a list of item IDs purchased by a specific user.
 
-```
+getItemName(uint8 _id) external view returns (string memory);
+// Retrieves the name of a specific item by its itemId.
 
-Through transferTokens transfering some amount of tokens from the caller account to the recipient account by some required check i.e user must have equal to greater than that tokens.
-In degen Game it will help to share game resources with other players.
+getItemPrice(uint8 _id) external view returns (uint256);
+// Retrieves the price of a specific item by its itemId.
 
-```Solidity
-function tranferTokens(address _recepient, uint _amount) external{
-        require(balanceOf(msg.sender) >= _amount);
-       transfer(_recepient, _amount);
+getBalance() external view returns (uint256);
+// Allows users to check their token balance.
 
-    }
-```
+burnToken(uint _amount) external;
+// Allows users to burn a specified amount of their tokens.
 
-Redeeming one tokens for one NFT (Game Asset NFT).
+Getting Started
+Installation
+Open in Remix
 
-```Solidity
+Executing Program
+To run this program, you can use Remix, an online Solidity IDE. To get started, go to the Remix website at Remix Ethereum.
 
-   ///@notice redeeming one token for a NFT 
-    function redeemTokens() external{
-        require(balanceOf(msg.sender) >= 1);
-        _transfer(msg.sender, address(this), 1);
-        gameAsset.safeMint(msg.sender);
-    }
-
-```
-
-Burning the game assets or Degen Game tokens.
-
-```Solidity
-
-
- ///@notice burn the _tokenAmount amount of token
-
-    function burnToken(uint _tokenAmount) external {
-        require( balanceOf(msg.sender)>=_tokenAmount);
-        _burn(msg.sender, _tokenAmount);
-    }
-
-```
-
-In case of emergency the owner the withdraw all the tokens from the contract through withdraw function.
-
-```Solidity
-///@notice to withdraw all tokens
-    function withdraw() external onlyOwner{
-          _transfer(address(this), owner, balanceOf(address(this)));
-    }
-```
-
-Now the code of GameAsset Contract
-
-```Solidity
 
 // SPDX-License-Identifier: MIT
-// Compatible with OpenZeppelin Contracts ^5.0.0
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
-
-contract GameAsset is ERC721 {
-    uint256 private _nextTokenId;
-
-    constructor()
-        ERC721("GameAsset", "GAT")
-    {}
-
-    function _baseURI() internal pure override returns (string memory) {
-        return "https://ipfs.io/ipfs/QmUKHAfQqRsNDdyAtgKkQtkk5atn7t9nuGSpaZ4wh4vcdh";
-    }
-
-    function safeMint(address to) public {
-        uint256 tokenId = _nextTokenId++;
-        _safeMint(to, tokenId);
-    }
+contract DegenToken is ERC20, Ownable, ERC20Burnable {
+    // Contract details here
 }
-```
+Help
+To compile the code, click on the "Solidity Compiler" tab in the left-hand sidebar. Make sure the "Compiler" option is set to "0.8.20" (or another compatible version), and then click on the "Compile DegenToken.sol" button.
 
-In this contract only two functions are there 
-- _baseURI : This Function sets the NFT's URI for minting.
-- safeMint : This Function safely mints (address!=address(0)) the NFT to the ```to``` addresss.
+Once the code is compiled, you can deploy the contract by clicking on the "Deploy & Run Transactions" tab in the left-hand sidebar. Select the "DegenToken" contract from the dropdown menu, and then click on the "Deploy" button.
 
+Authors
+Utkarsh Vinayak
 
-
-The author of this file is Utkarsh Vinayak.
-email id : utkarshvinayak7@gmail.com
+License
+This project is licensed under the MIT License - see the LICENSE.md file for details.
